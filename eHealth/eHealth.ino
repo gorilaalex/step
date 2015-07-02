@@ -5,12 +5,19 @@
 
 SoftwareSerial esp8266(2,3); //tx from esp is connected to pin 2, and rx from esp is connected to pin 3
 
+const int m1 = 5, m2 = 6 , m3 = 9 , m4 = 10; // motors connection
+
 void setup() {
   Serial.begin(9600);
   esp8266.begin(9600);
   
-  //initWifiAccessPointBroadcast("BelowZero","wader1917");
+  pinMode(m1, OUTPUT);
+  pinMode(m2, OUTPUT);
+  pinMode(m3, OUTPUT);
+  pinMode(m4, OUTPUT);
+  
   initWifiAccessPoint("BelowZero","wader1917");
+  //initWifiServer();
 }
 
 String getOutput(int number){
@@ -28,28 +35,16 @@ if(esp8266.available()) // check if the esp is sending a message
      int connectionId = esp8266.read()-48; // subtract 48 because the read() function returns 
                                            // the ASCII decimal value and 0 (the first decimal number) starts at 48
           
-     esp8266.find("c="); // advance cursor to "pin="
+     esp8266.find("c="); // advance cursor to "c="
           
-     int pinNumber = (esp8266.read()-48); // get boolean value (1 open, 0 close)
+     int pinNumber = (esp8266.read()-48); // get boolean value (0 request data, 1,2,3 turn on motors)
      
      Serial.write(esp8266.read());
-     if(pinNumber==1){
-       //open
-       Serial.write("pin is 1");
-       turnLeft();
-     }
-     else {
-       //close
-       Serial.write("pin is 0");
-       turnRight();
-     }
-      // toggle pin    
      
      // build string that is send back to device that is requesting pin toggle
      String content;
-     content = "Pin ";
+     content = "Requested data is ";
      content += pinNumber;
-     content += " is ";
      
      if(pinNumber==0){
        content += analogRead(A0);
@@ -61,17 +56,20 @@ if(esp8266.available()) // check if the esp is sending a message
        content += analogRead(A3);
        
      }
-     
-     /*if(digitalRead(pinNumber))
-     {
-       content += "Open";
+     else if(pinNumber==1){ // turn on one motor
+       content += " motor 1 open.";
+       vibrate1();
      }
-     else
-     {
-       content += " Close";
-     }*/
      
-     sendCIPData(connectionId,content);
+     else if(pinNumber==2){ // turn on two motors
+        content += " motors 1 and 2 open.";
+        vibrate2();
+     }
+     else if(pinNumber==3){ // turn on three motors
+        content += " motors 1,2 and 3 open.";
+        vibrate3();
+     }
+     
      sendHTTPResponse(connectionId,content);
      
      // make close command
@@ -135,12 +133,11 @@ void sendHTTPResponse(int connectionId, String content)
      String httpResponse;
      String httpHeader;
      // HTTP Header
-     httpHeader = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=UTF-8\r\n"; 
+     httpHeader = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n"; 
      httpHeader += "Content-Length: ";
      httpHeader += content.length();
      httpHeader += "\r\n";
-     //httpHeader += " Keep-Alive: timeout=3, max=8\r\n";
-     httpHeader +="Connection: close\r\n\r\n";
+     httpHeader +="Connection: keep-alive\r\n\r\n";
      httpResponse = httpHeader + content + " "; // There is a bug in this code: the last character of "content" is not sent, I cheated by adding this extra space
      
      sendCIPData(connectionId,httpResponse);
@@ -228,37 +225,35 @@ void initWifiAccessPoint(String ssid,String password){
   Serial.println("Access point Ready");
 }
 
-void initWifiAccessPointBroadcast(String ssid,String password){
-  sendCommand("AT+RST\r\n",2000); // reset module
-  sendCommand("AT+CWMODE=3\r\n",1000); // configure as access point
-  sendCommand("AT+CWJAP=\""+ssid +"\",\""+password+"\"\r\n",3000);//connection details
-  delay(10000);
-  sendCommand("AT+CIFSR\r\n",1000); // get ip address
-  sendCommand("AT+CIPMUX=1\r\n",1000); // configure for multiple connections
-  
-  sendCommand("AT+CIPSTART=4,\"UDP\",\"192.168.43.184\",\"3555\",\"8080\",0\r\n",1000); // configure for multiple connections
-  
-  sendCIPData(0,">mesage");
-  
-  //sendCommand("+IPD")
-  //sendCommand("AT+CIPSERVER=1,80\r\n",1000); // turn on server on port 80
-  //sendCommand("AT+CIPSTO=1,9000\r\n",1000);
- 
- // sendCommand("AT+CIPSTATUS=?\r\n",1000);
- 
-  //sendCommand("AT+CIFSR",1000);
- 
-  //Serial.println("Broadcast Ready");
+void vibrate1()
+{
+digitalWrite(m1, HIGH);
+delay(3000);
+digitalWrite(m1, LOW);
 }
 
-//"open" function
-void turnLeft() {
-  Serial.println("turnLeft");
+void vibrate2()
+{
+digitalWrite(m1, HIGH);
+digitalWrite(m3, HIGH);
+delay(3000);
+digitalWrite(m1, LOW);
+digitalWrite(m3, LOW);
+}
+ 
+ 
+void vibrate3()
+{
+digitalWrite(m1, HIGH);
+digitalWrite(m2, HIGH);
+digitalWrite(m3, HIGH);
+digitalWrite(m4, HIGH);
+delay(3000);
+digitalWrite(m1, LOW);
+digitalWrite(m2, LOW);
+digitalWrite(m3, LOW);
+digitalWrite(m4, LOW);
 }
 
-//"close" function
-void turnRight() {
-  Serial.println("turnRight");
-}
 
 
